@@ -1,12 +1,7 @@
-
-
-
-
-
 const express = require('express')
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-
+    
 // Config
 require('dotenv').config()
 const app = express()
@@ -19,6 +14,7 @@ app.use(express.json())
               
 const uri = `mongodb+srv://${process.env.USERNAME}:${process.env.PASSWORD}@cluster0.uc340vx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
 
+ 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version     
 const client = new MongoClient(uri, {
   serverApi: {
@@ -117,12 +113,14 @@ app.put("/matches/:matchId", async (req, res) => {
     // Handle boundary increments (4s and 6s)
     if (incrementValue === 4) {
       updateFields.$inc["batter.$[strikingBatter].fours"] = 1;
+      updateFields.$push = { lastTen: 4 };
     }
     if (incrementValue === -4) {
       updateFields.$inc["batter.$[strikingBatter].fours"] = -1;
     }
     if (incrementValue === 6) {
       updateFields.$inc["batter.$[strikingBatter].sixes"] = 1;
+      updateFields.$push = { lastTen: 6 };
     }
     if (incrementValue === -6) {
       updateFields.$inc["batter.$[strikingBatter].sixes"] = -1;
@@ -131,6 +129,21 @@ app.put("/matches/:matchId", async (req, res) => {
     // If the total number of team balls crosses 6, reset teamBall and increment overs
     if (teamBall + ballIncrement >= 6) {
       updateFields.$set = { teamBall: 0 }; // Reset teamBall
+    }
+    if (incrementValue === 1) {
+      updateFields.$push = { lastTen: 1 };
+    }
+    if (incrementValue === 2) {
+      updateFields.$push = { lastTen: 2 };
+    }
+    if (incrementValue === 3) {
+      updateFields.$push = { lastTen: 3 };
+    }
+    if (incrementValue === 0) {
+      updateFields.$push = { lastTen: 0 };
+    }
+    if (incrementOver === 1) {
+      updateFields.$push = { lastTen: "|" };
     }
 
     // Execute the update query
@@ -165,6 +178,66 @@ app.delete('/matches/:id', async (req, res) => {
   const result = await MatchInfo.deleteOne(filter)
   res.send(result)
 })
+// Delete from LastTen    
+
+app.delete('/matches/:id/lastten', async (req, res) => {
+  const { id } = req.params; // Match ID
+  const { index, extra } = req.body; // The index and the extra value to remove from lastTen
+
+  // console.log('Removing item:', extra, 'at index:', index);
+
+  if (typeof index !== 'number' || !extra) {
+    return res.status(400).json({ success: false, message: "Invalid index or extra value" });
+  }
+
+  try {
+    // Fetch the current match document to get the lastTen array
+    const match = await MatchInfo.findOne({ _id: new ObjectId(id) });
+ 
+
+    // Get the current lastTen array
+    const lastTenArray = match.lastTen;
+
+    console.log('Current lastTen array:', lastTenArray);
+
+    // Reverse the array to match the index being sent from the frontend
+    const reversedArray = [...lastTenArray].reverse(); 
+
+    // Check if the item at the specified reversed index matches the extra value
+    if (reversedArray[index] === extra) {
+      // Remove the item at that index in the original array
+      lastTenArray.splice(lastTenArray.length - 1 - index, 1);  // Reverse the index back for removal
+    } else {
+      return res.status(400).json({ success: false, message: "Item at the specified index does not match the extra value" });
+    }
+
+    // Update the document with the modified lastTen array
+    const result = await MatchInfo.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { lastTen: lastTenArray } } // Set the modified array
+    );
+
+    if (result.modifiedCount > 0) {
+      res.send({ success: true, modifiedCount: result.modifiedCount });
+    } else {
+      res.status(404).json({ success: false, message: "No changes made to lastTen" });
+    }
+  } catch (error) {
+    console.error("Error removing from lastTen:", error);
+    res.status(500).json({ success: false, error: "An error occurred while removing from lastTen" });
+  }
+});
+ 
+ 
+
+
+
+ 
+ 
+ 
+ 
+
+
  
 app.put('/matches/:id/:batterid', async (req, res) => {
   const matchId = req.params.id; // Match document ID
@@ -200,6 +273,12 @@ app.put('/matches/:id/:batterid', async (req, res) => {
         ...updateQuery.$inc, // Keep the previous increment logic
         "batter.$[strikingBatter].ball": 1, // Increment the ball for the batter with strike: true
         "bowler.$[bowlerElem].Wicket": increamentWicket, // Increment bowler's Wicket if not "runOut"
+      };
+    }
+
+    if (increamentWicket > 0) {
+      updateQuery.$push = {
+        lastTen: "w",
       };
     }
 
@@ -355,12 +434,54 @@ app.put('/extra/:id', async (req, res) => {
     // Conditionally add specific "extra" fields dynamically
     if (extra === "wide") {
       updateFields.$inc.wide = incrementValue; // Wide runs
+      if(extra === "wide" && incrementValue ===1){
+        updateFields.$push = { lastTen: "wd" };
+      }
+      if(extra === "wide" && incrementValue ===2){
+        updateFields.$push = { lastTen: "2wd" };
+      }
+      if(extra === "wide" && incrementValue ===3){
+        updateFields.$push = { lastTen: "3wd" };
+      }
+      if(extra === "wide" && incrementValue ===4){
+        updateFields.$push = { lastTen: "4wd" };
+      }
+      if(extra === "wide" && incrementValue ===5){
+        updateFields.$push = { lastTen: "5wd" };
+      }
     } else if (extra === "noBall") {
       updateFields.$inc.noBall = incrementValue; // No-ball runs
+      updateFields.$push = { lastTen: "nb" };
     } else if (extra === "legBye") {
       updateFields.$inc.legbye = incrementValue; // Leg bye runs
+      if(extra === "legBye" && incrementValue ===1){
+        updateFields.$push = { lastTen: "1lb" };
+      }
+      if(extra === "legBye" && incrementValue ===2){
+        updateFields.$push = { lastTen: "2lb" };
+      }
+      if(extra === "legBye" && incrementValue ===3){
+        updateFields.$push = { lastTen: "3lb" };
+      }
+      if(extra === "legBye" && incrementValue ===4){
+        updateFields.$push = { lastTen: "4lb" };
+      }
+      
     } else if (extra === "bye") {
       updateFields.$inc.bye = incrementValue; // Bye runs
+      if(extra === "bye" && incrementValue ===1){
+        updateFields.$push = { lastTen: "1b" };
+      }
+      if(extra === "bye" && incrementValue ===2){
+        updateFields.$push = { lastTen: "2b" };
+      }
+      if(extra === "bye" && incrementValue ===3){
+        updateFields.$push = { lastTen: "3b" };
+      }
+      if(extra === "bye" && incrementValue ===4){
+        updateFields.$push = { lastTen: "4b" };
+      }
+      
     }
 
     // Database update logic
