@@ -11,10 +11,9 @@ const port = process.env.PORT || 3000
 app.use(cors());
 app.use(express.json())
                     
-              
+                              
 const uri = `mongodb+srv://${process.env.USERNAME}:${process.env.PASSWORD}@cluster0.uc340vx.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`
-
- 
+             
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version     
 const client = new MongoClient(uri, {
   serverApi: {
@@ -48,8 +47,6 @@ async function run() {
         const id = req.params.id; // ID of the match to update
         const newData = req.body; // Data to be added
 
-        // console.log(id, active); 
-        // console.log(newData.type === "bowler")
       
         const filter = { _id: new ObjectId(id) };
       
@@ -127,7 +124,7 @@ app.put("/matches/:matchId", async (req, res) => {
     }
       
     // If the total number of team balls crosses 6, reset teamBall and increment overs
-    if (teamBall + ballIncrement >= 6) {
+    if (teamBall === 6) {
       updateFields.$set = { teamBall: 0 }; // Reset teamBall
     }
     if (incrementValue === 1) {
@@ -144,7 +141,7 @@ app.put("/matches/:matchId", async (req, res) => {
     }
     if (incrementOver === 1) {
       updateFields.$push = { lastTen: "|" };
-    }
+    }    
 
     // Execute the update query
     const result = await MatchInfo.updateOne(
@@ -156,7 +153,60 @@ app.put("/matches/:matchId", async (req, res) => {
           { "strikingBowler.strike": true }, // Filter for the bowler on strike
         ],
       }
-    );
+    );  
+
+    // change the batter strike if incrementValue 1 and 3 or incrementOver 1
+
+    if (incrementValue === 1 || incrementValue === 3 || incrementOver ===1) {
+      try {
+        // Step 1: Fetch the match document
+        const matchData = await MatchInfo.findOne({ _id: new ObjectId(matchId) });
+        if (!matchData) {
+          return res.status(404).json({ success: false, message: "Match not found" });
+        }
+    
+        const batters = matchData.batter;
+    
+        // Debugging logs to check batter data
+        console.log("Batters Data:", batters);
+    
+        // Step 2: Identify the current striker
+        const currentStriker = batters.find(b => b.active === true && b.strike === true);
+    
+        // Step 3: Identify the other active batter
+        const nextStriker = batters.find(b => b.active === true && b.id !== currentStriker?.id);
+    
+        console.log("Current Striker:", currentStriker);
+        console.log("Next Striker:", nextStriker);
+    
+        // Step 4: Update strike status
+        if (currentStriker && nextStriker) {
+          const strikeSwapResult = await MatchInfo.updateOne(
+            { _id: new ObjectId(matchId) },
+            {
+              $set: {
+                "batter.$[currentStriker].strike": false, // Current striker becomes non-striker
+                "batter.$[nextStriker].strike": true, // Other active batter becomes striker
+              },
+            },
+            {
+              arrayFilters: [
+                { "currentStriker.id": currentStriker.id }, // Match the current striker
+                { "nextStriker.id": nextStriker.id }, // Match the next striker
+              ],
+            }
+          );
+    
+          console.log("Strike Swap Result:", strikeSwapResult);
+        } else {
+          console.error("Error: Unable to find the next striker.");
+          return res.status(400).json({ success: false, message: "Next striker missing." });
+        }
+      } catch (error) {
+        console.error("Error swapping strike:", error);
+        return res.status(500).json({ success: false, error: "Strike swap failed" });
+      }
+    }     
 
     if (result.modifiedCount > 0) {
       res.send({ success: true, modifiedCount: result.modifiedCount });
@@ -167,10 +217,8 @@ app.put("/matches/:matchId", async (req, res) => {
     console.error("Error updating match data:", error);
     res.status(500).json({ success: false, error: "An error occurred while updating match data" });
   }
-});
- 
+});     
 
-// Delete Match
 
 app.delete('/matches/:id', async (req, res) => {
   const id = req.params.id; // ID of the match to update
@@ -178,6 +226,7 @@ app.delete('/matches/:id', async (req, res) => {
   const result = await MatchInfo.deleteOne(filter)
   res.send(result)
 })
+
 // Delete from LastTen    
 
 app.delete('/matches/:id/lastten', async (req, res) => {
@@ -186,9 +235,7 @@ app.delete('/matches/:id/lastten', async (req, res) => {
 
   // console.log('Removing item:', extra, 'at index:', index);
 
-  if (typeof index !== 'number' || !extra) {
-    return res.status(400).json({ success: false, message: "Invalid index or extra value" });
-  }
+
 
   try {
     // Fetch the current match document to get the lastTen array
@@ -227,17 +274,6 @@ app.delete('/matches/:id/lastten', async (req, res) => {
     res.status(500).json({ success: false, error: "An error occurred while removing from lastTen" });
   }
 });
- 
- 
-
-
-
- 
- 
- 
- 
-
-
  
 app.put('/matches/:id/:batterid', async (req, res) => {
   const matchId = req.params.id; // Match document ID
@@ -317,9 +353,6 @@ app.put('/matches/:id/:batterid', async (req, res) => {
   }
 });
  
-            
-      
-
 app.get('/matches/:id?', async (req, res) => {
     const id = req.params.id;
     if (id) {
@@ -449,9 +482,10 @@ app.put('/extra/:id', async (req, res) => {
       if(extra === "wide" && incrementValue ===5){
         updateFields.$push = { lastTen: "5wd" };
       }
-    } else if (extra === "noBall") {
+    } 
+    else if (extra === "noBall") {
       updateFields.$inc.noBall = incrementValue; // No-ball runs
-      updateFields.$push = { lastTen: "nb" };
+      updateFields.$push = { lastTen: "nb+" };
     } else if (extra === "legBye") {
       updateFields.$inc.legbye = incrementValue; // Leg bye runs
       if(extra === "legBye" && incrementValue ===1){
