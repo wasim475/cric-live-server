@@ -219,6 +219,7 @@ app.put("/matches/:matchId", async (req, res) => {
   }
 });     
 
+// Delete Matches
 
 app.delete('/matches/:id', async (req, res) => {
   const id = req.params.id; // ID of the match to update
@@ -444,7 +445,7 @@ app.put("/matches/:matchId/batter/:batterId/strike", async (req, res) => {
   }
 });
 
-// update extra portion
+// update extra run portion
 app.put('/extra/:id', async (req, res) => {
   const { id } = req.params; // Route parameter fix
   const { incrementValue = 0, extra } = req.body; // Default values
@@ -525,6 +526,55 @@ app.put('/extra/:id', async (req, res) => {
       { arrayFilters: [{ "strikingBowler.strike": true }] } // Optional for specific bowler update
     );
 
+   // Batter strike change if wide2, wide4, bye1, bye3, lb1, lb3 incrementValue
+
+if (
+  (extra === "bye" && (incrementValue === 1 || incrementValue === 3)) ||
+  (extra === "legBye" && (incrementValue === 1 || incrementValue === 3)) ||
+  (extra === "wide" && (incrementValue === 2 || incrementValue === 4))
+) {
+  try {
+    // Fetch the match document
+    const matchData = await MatchInfo.findOne({ _id: new ObjectId(id) });
+    if (!matchData) {
+      return res.status(404).json({ success: false, message: "Match not found" });
+    }
+
+    const batters = matchData.batter;
+
+    // Identify the current striker and the other active batter
+    const currentStriker = batters.find(b => b.active === true && b.strike === true);
+    const nextStriker = batters.find(b => b.active === true && b.id !== currentStriker?.id);
+
+    if (currentStriker && nextStriker) {
+      // Update strike status
+      const strikeSwapResult = await MatchInfo.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            "batter.$[currentStriker].strike": false,
+            "batter.$[nextStriker].strike": true,
+          },
+        },
+        {
+          arrayFilters: [
+            { "currentStriker.id": currentStriker.id },
+            { "nextStriker.id": nextStriker.id },
+          ],
+        }
+      );
+      console.log("Strike Swap Result:", strikeSwapResult);
+    } else {
+      console.error("Error: Unable to find the next striker.");
+      return res.status(400).json({ success: false, message: "Next striker missing." });
+    }
+  } catch (error) {
+    console.error("Error swapping strike:", error);
+    return res.status(500).json({ success: false, error: "Strike swap failed" });
+  }
+}
+
+
     // Success Response
     if (result.modifiedCount > 0) {
       res.send({ success: true, modifiedCount: result.modifiedCount });
@@ -536,6 +586,71 @@ app.put('/extra/:id', async (req, res) => {
     res.status(500).json({ success: false, error: "An error occurred while updating match data" });
   }
 });
+
+// Update Bowler Name
+     
+
+app.put('/matches/:matchId/updatebowlername/:id', async (req, res) => {
+  const { matchId, id } = req.params;
+  const { updateName } = req.body; // Extract `name` from the request body
+
+  if (!updateName) {
+    return res.status(400).send({ error: "Name is required" });
+  }
+
+  const filter = { _id: new ObjectId(matchId), "bowler.id": id }; // Match the specific document and bowler
+  const update = {
+    $set: {
+      "bowler.$.name": updateName, // Update the name of the matched bowler
+    },
+  };
+
+  try {
+    const result = await MatchInfo.updateOne(filter, update);
+
+    if (result.modifiedCount > 0) {
+      res.status(200).send({ success: true, message: "Bowler info updated successfully" });
+    } else {
+      res.status(404).send({ success: false, message: "Bowler not found or no changes made" });
+    }
+  } catch (error) {
+    console.error("Error updating bowler info:", error);
+    res.status(500).send({ success: false, message: "Internal server error" });
+  }
+});
+
+// Update  Batter Name 
+
+app.put('/matches/:matchId/updatebattername/:id', async (req, res) => {
+  const { matchId, id } = req.params;
+  const { updateName } = req.body; // Extract `name` from the request body
+
+  if (!updateName) {
+    return res.status(400).send({ error: "Name is required" });
+  }
+
+  const filter = { _id: new ObjectId(matchId), "batter.id": id }; // Match the specific document and batter
+  const update = {
+    $set: {
+      "batter.$.name": updateName, // Update the name of the matched batter
+    },
+  };
+
+  try {
+    const result = await MatchInfo.updateOne(filter, update);
+
+    if (result.modifiedCount > 0) {
+      res.status(200).send({ success: true, message: "Batter info updated successfully" });
+    } else {
+      res.status(404).send({ success: false, message: "Batter not found or no changes made" });
+    }
+  } catch (error) {
+    console.error("Error updating batter info:", error);
+    res.status(500).send({ success: false, message: "Internal server error" });
+  }
+});
+
+
       
       
              
