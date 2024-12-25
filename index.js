@@ -28,21 +28,33 @@ async function run() {
   try {
     const MatchInfo = client.db('MatchDB').collection('MatchLists')
     
-
+  /*=======================================================
+            Get Match Data Start
+===========================================================*/  
     app.get('/matches', async(req, res)=>{
         const cursor = MatchInfo.find()
         const result = await cursor.toArray()
         res.send(result)
      
       })
+   /*=======================================================
+            Get Match Data End
+===========================================================*/  
 
-     
+     /*=======================================================
+            Added Match Start
+===========================================================*/  
       app.post('/matches', async(req, res)=>{
         const match = req.body;
         const result = await MatchInfo.insertOne(match)
         res.send(result)
       })
-
+  /*=======================================================
+            Added Match End
+===========================================================*/  
+/*=======================================================
+            Added Bowler and Batter Start
+===========================================================*/  
       app.post('/matches/:id', async (req, res) => {
         const id = req.params.id; // ID of the match to update
         const newData = req.body; // Data to be added
@@ -72,8 +84,15 @@ async function run() {
       
         res.send({ success: true, modifiedCount: result.modifiedCount });
       });
+
+  /*=======================================================
+            Added Bowler and Batter End
+===========================================================*/  
        
-//  Total and batter-bawlers runs update                                          
+//    
+/*=======================================================
+            Total and batter-bawlers runs update Start
+===========================================================*/                                        
    
 app.put("/matches/:matchId", async (req, res) => {
   const { matchId } = req.params;
@@ -217,9 +236,16 @@ app.put("/matches/:matchId", async (req, res) => {
     console.error("Error updating match data:", error);
     res.status(500).json({ success: false, error: "An error occurred while updating match data" });
   }
-});     
+});  
 
-// Delete Matches
+/*=======================================================
+            Total and batter-bawlers runs update End
+===========================================================*/  
+
+
+/*=======================================================
+            Delete Matches Start
+===========================================================*/  
 
 app.delete('/matches/:id', async (req, res) => {
   const id = req.params.id; // ID of the match to update
@@ -228,7 +254,14 @@ app.delete('/matches/:id', async (req, res) => {
   res.send(result)
 })
 
-// Delete from LastTen    
+/*=======================================================
+            Delete Matches End
+===========================================================*/  
+
+
+ /*=======================================================
+               Delete from LastTen  Start
+===========================================================*/  
 
 app.delete('/matches/:id/lastten', async (req, res) => {
   const { id } = req.params; // Match ID
@@ -275,6 +308,13 @@ app.delete('/matches/:id/lastten', async (req, res) => {
     res.status(500).json({ success: false, error: "An error occurred while removing from lastTen" });
   }
 });
+ /*=======================================================
+               Delete from LastTen  End
+===========================================================*/ 
+
+ /*=======================================================
+            out, active change, added "w" in lastTen  Start
+===========================================================*/ 
  
 app.put('/matches/:id/:batterid', async (req, res) => {
   const matchId = req.params.id; // Match document ID
@@ -353,6 +393,10 @@ app.put('/matches/:id/:batterid', async (req, res) => {
     });
   }
 });
+
+/*=======================================================
+            out, active change, added "w" in lastTen  End
+===========================================================*/
  
 app.get('/matches/:id?', async (req, res) => {
     const id = req.params.id;
@@ -369,7 +413,10 @@ app.get('/matches/:id?', async (req, res) => {
 
 
 
-// Batter Strike changes
+
+/*=======================================================
+                Batter Strike changes start
+===========================================================*/ 
 app.put("/matches/:matchId/batter/:batterId/strike", async (req, res) => {
   const { matchId, batterId } = req.params;
 
@@ -407,7 +454,14 @@ app.put("/matches/:matchId/batter/:batterId/strike", async (req, res) => {
   }
 });
 
-  // Bowler Strike changes
+/*=======================================================
+                Batter Strike changes End
+===========================================================*/ 
+
+
+  /*=======================================================
+                Bowler Strike changes start
+===========================================================*/ 
   app.put("/matches/:matchId/bowler/:bowlerId/strike", async (req, res) => {
   const { matchId, bowlerId } = req.params;
 
@@ -444,8 +498,14 @@ app.put("/matches/:matchId/batter/:batterId/strike", async (req, res) => {
     res.status(500).json({ success: false, error: "An error occurred while updating strike" });
   }
 });
+  /*=======================================================
+                Bowler Strike changes End
+===========================================================*/ 
 
-// update extra run portion
+
+  /*=======================================================
+                 update extra run start
+===========================================================*/ 
 app.put('/extra/:id', async (req, res) => {
   const { id } = req.params; // Route parameter fix
   const { incrementValue = 0, extra } = req.body; // Default values
@@ -586,10 +646,15 @@ if (
     res.status(500).json({ success: false, error: "An error occurred while updating match data" });
   }
 });
+  /*=======================================================
+                 update extra run End
+===========================================================*/ 
 
-// Update Bowler Name
+
      
-
+  /*=======================================================
+                 Update Bowler Name start
+===========================================================*/ 
 app.put('/matches/:matchId/updatebowlername/:id', async (req, res) => {
   const { matchId, id } = req.params;
   const { updateName } = req.body; // Extract `name` from the request body
@@ -619,7 +684,14 @@ app.put('/matches/:matchId/updatebowlername/:id', async (req, res) => {
   }
 });
 
-// Update  Batter Name 
+ /*=======================================================
+                 Update Bowler Name End
+===========================================================*/ 
+
+
+ /*=======================================================
+                 Update Batter Name Start
+===========================================================*/ 
 
 app.put('/matches/:matchId/updatebattername/:id', async (req, res) => {
   const { matchId, id } = req.params;
@@ -649,6 +721,10 @@ app.put('/matches/:matchId/updatebattername/:id', async (req, res) => {
     res.status(500).send({ success: false, message: "Internal server error" });
   }
 });
+
+ /*=======================================================
+                 Update Batter Name End
+===========================================================*/ 
 
 
       
