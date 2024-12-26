@@ -131,6 +131,10 @@ app.put("/matches/:matchId", async (req, res) => {
       updateFields.$inc["batter.$[strikingBatter].fours"] = 1;
       updateFields.$push = { lastTen: 4 };
     }
+    if (incrementValue === 5) {
+      updateFields.$inc["batter.$[strikingBatter].fours"] = 1;
+      updateFields.$push = { lastTen: 5 };
+    }
     if (incrementValue === -4) {
       updateFields.$inc["batter.$[strikingBatter].fours"] = -1;
     }
@@ -176,7 +180,7 @@ app.put("/matches/:matchId", async (req, res) => {
 
     // change the batter strike if incrementValue 1 and 3 or incrementOver 1
 
-    if (incrementValue === 1 || incrementValue === 3 || incrementOver ===1) {
+    if (incrementValue === 1 || incrementValue === 3 || incrementValue === 5 || incrementOver ===1) {
       try {
         // Step 1: Fetch the match document
         const matchData = await MatchInfo.findOne({ _id: new ObjectId(matchId) });
@@ -319,7 +323,7 @@ app.delete('/matches/:id/lastten', async (req, res) => {
 app.put('/matches/:id/:batterid', async (req, res) => {
   const matchId = req.params.id; // Match document ID
   const batterId = req.params.batterid; // Batter ID
-  const { active, increamentWicket = 0, wicket } = req.body; // Added `wicket` to request body
+  const { active, increamentWicket = 0, wicket, outBy } = req.body; // Added `wicket` to request body
 
   try {
     // Check if the document matches the query
@@ -344,12 +348,15 @@ app.put('/matches/:id/:batterid', async (req, res) => {
       },
     };
 
-    // Add ball increment for the striking batter
     if (wicket !== "runOut") {
       updateQuery.$inc = {
-        ...updateQuery.$inc, // Keep the previous increment logic
-        "batter.$[strikingBatter].ball": 1, // Increment the ball for the batter with strike: true
-        "bowler.$[bowlerElem].Wicket": increamentWicket, // Increment bowler's Wicket if not "runOut"
+        ...updateQuery.$inc,
+        "batter.$[strikingBatter].ball": 1,
+        "bowler.$[bowlerElem].Wicket": increamentWicket,
+      };
+      updateQuery.$set = {
+        ...updateQuery.$set,
+        "batter.$[strikingBatter].outBy": outBy,
       };
     }
 
@@ -361,22 +368,19 @@ app.put('/matches/:id/:batterid', async (req, res) => {
 
     // Array filters to target the batter and active bowler
     const arrayFilters = [
-      { "elem.id": batterId }, // Filter for the batter
+      { "elem.id": batterId },
     ];
 
-    // Add the filter for the striking batter (if necessary)
     if (wicket !== "runOut") {
-      arrayFilters.push({ "strikingBatter.strike": true }); // Filter for the batter on strike
-      arrayFilters.push({ "bowlerElem.strike": true }); // Only add bowler filter when needed
+      arrayFilters.push({ "strikingBatter.strike": true });
+      arrayFilters.push({ "bowlerElem.strike": true });
     }
 
     // Perform the update
     const result = await MatchInfo.updateOne(
       { _id: new ObjectId(matchId) },
       updateQuery,
-      {
-        arrayFilters,
-      }
+      { arrayFilters }
     );
 
     if (result.modifiedCount > 0) {
@@ -393,6 +397,7 @@ app.put('/matches/:id/:batterid', async (req, res) => {
     });
   }
 });
+
 
 /*=======================================================
             out, active change, added "w" in lastTen  End
